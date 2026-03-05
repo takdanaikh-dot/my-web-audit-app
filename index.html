@@ -1,0 +1,319 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>MHR Audit System - Full Official Version</title>
+    <link href="https://fonts.googleapis.com/css2?family=Kanit:wght@300;500;700&family=Sarabun:wght@300;400;600&display=swap" rel="stylesheet">
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <style>
+        :root { --primary-gradient: linear-gradient(135deg, #6a2c91 0%, #a4508b 100%); --soft-bg: #f8f9fc; }
+        body { background-color: var(--soft-bg); font-family: 'Sarabun', sans-serif; color: #444; }
+        .kanit { font-family: 'Kanit', sans-serif; }
+        .header-section { background: var(--primary-gradient); color: white; padding: 40px 0; border-bottom-left-radius: 50px; border-bottom-right-radius: 50px; margin-bottom: 20px; }
+        .nav-pills { background: white; padding: 10px; border-radius: 40px; box-shadow: 0 4px 15px rgba(0,0,0,0.05); }
+        .nav-link.active { background: var(--primary-gradient) !important; border-radius: 30px; }
+        .card { border-radius: 25px; border: none; box-shadow: 0 10px 30px rgba(0,0,0,0.08); margin-bottom: 25px; }
+        .section-header { background: rgba(106, 44, 145, 0.07); padding: 12px 20px; border-left: 8px solid #6a2c91; font-weight: 700; color: #6a2c91; margin: 30px 0 15px 0; font-family: 'Kanit'; }
+        .q-row { padding: 12px 18px; border-radius: 12px; margin-bottom: 8px; border: 1px solid #f0f0f0; background: #fff; transition: 0.2s; }
+        .q-row:hover { border-color: #a4508b; transform: translateX(5px); }
+        .score-box { background: #fff; border: 2px solid #6a2c91; border-radius: 20px; padding: 20px; text-align: center; position: sticky; top: 20px; }
+        #login-screen { position: fixed; inset: 0; background: var(--soft-bg); z-index: 10000; display: flex; align-items: center; justify-content: center; }
+        .analysis-report { background: #fdf2f8; border-radius: 15px; padding: 15px; margin-top: 15px; display: none; border: 1px solid #e1bee7; }
+    </style>
+</head>
+<body>
+
+<div id="login-screen">
+    <div class="card p-5 text-center shadow-lg" style="max-width: 400px; width: 90%;">
+        <h2 class="kanit fw-700 text-primary">MHR Audit HAIT</h2>
+        <p class="text-muted small">เข้าใช้งานด้วย CMU Mail (@cmu.ac.th)</p>
+        <form id="auth-form">
+            <input type="email" id="email" class="form-control mb-3" placeholder="username@cmu.ac.th" required>
+            <button type="submit" class="btn btn-primary w-100 fw-bold py-2">เข้าสู่ระบบ</button>
+        </form>
+    </div>
+</div>
+
+<div id="app-content" style="display: none;">
+    <div class="header-section text-center position-relative">
+        <button class="btn btn-sm btn-outline-light position-absolute top-0 end-0 m-3" onclick="logout()">Logout</button>
+        <h1 class="kanit fw-700">🏥 MHR Audit HAIT (Official Full Version)</h1>
+        <p id="user-display" class="small opacity-75 mb-0"></p>
+    </div>
+
+    <div class="container mt-4">
+        <ul class="nav nav-pills nav-fill mb-4 shadow-sm">
+            <li class="nav-item"><button class="nav-link active" id="btn-tab-form" data-bs-toggle="pill" data-bs-target="#tab-form">📝 บันทึกคะแนน</button></li>
+            <li class="nav-item"><button class="nav-link" data-bs-toggle="pill" data-bs-target="#tab-list" onclick="renderTable()">📂 คลังประวัติ & Deep Export</button></li>
+            <li class="nav-item"><button class="nav-link" data-bs-toggle="pill" data-bs-target="#tab-dash" onclick="updateDashboard()">📊 แดชบอร์ดความสมบูรณ์</button></li>
+        </ul>
+
+        <div class="tab-content">
+            <div class="tab-pane fade show active" id="tab-form">
+                <div class="row">
+                    <div class="col-lg-8">
+                        <div class="card p-4">
+                            <form id="auditForm">
+                                <input type="hidden" id="edit-id">
+                                <div class="row g-3 mb-4">
+                                    <div class="col-md-4"><label class="fw-bold mb-1">📅 วันที่ประเมิน</label><input type="date" id="date" class="form-control" required></div>
+                                    <div class="col-md-4"><label class="fw-bold mb-1">🆔 HN ผู้ป่วย*</label><input type="text" id="hn" class="form-control" placeholder="กรอก HN" required></div>
+                                    <div class="col-md-4"><label class="fw-bold mb-1">🏢 หน่วยงาน</label><select id="department" class="form-select" required></select></div>
+                                </div>
+
+                                <div class="section-header">1. การบันทึกของแพทย์ (Physician Criteria)</div>
+                                <div id="doctor-qs"></div>
+                                <div class="section-header">2. การบันทึกทางการพยาบาล (Nursing Criteria)</div>
+                                <div id="nurse-qs"></div>
+                                <div class="section-header">3. การประเมินความเสี่ยงพิเศษ (Pain/Fall/PI)</div>
+                                <div id="risk-qs"></div>
+
+                                <div class="mt-4"><label class="fw-bold mb-1">📝 ข้อเสนอแนะเพื่อการปรับปรุง*</label><textarea id="comment" class="form-control" rows="3" required placeholder="ระบุสิ่งที่ควรปรับปรุง"></textarea></div>
+                                <div class="d-flex gap-2 mt-4">
+                                    <button type="button" class="btn btn-info fw-bold w-100 py-3 text-white" onclick="analyzeBeforeSave()">🔍 Analyze (วิเคราะห์ก่อนบันทึก)</button>
+                                    <button type="submit" class="btn btn-primary fw-bold w-100 py-3 shadow">💾 บันทึกข้อมูล (Save)</button>
+                                </div>
+                            </form>
+                        </div>
+                    </div>
+                    <div class="col-lg-4">
+                        <div class="score-box shadow-sm mb-3">
+                            <h5 class="kanit text-muted">ความสมบูรณ์รวม</h5>
+                            <div id="live-score" class="display-4 fw-bold text-primary">0%</div>
+                        </div>
+                        <div id="pre-save-analysis" class="analysis-report shadow-sm">
+                            <h6 class="fw-bold text-purple">🔍 วิเคราะห์เบื้องต้นรายหมวด:</h6><hr class="my-2"><div id="analysis-content" class="small"></div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="tab-pane fade" id="tab-list">
+                <div class="card p-4 shadow-sm">
+                    <div class="row g-3 mb-4 align-items-end">
+                        <div class="col-md-5"><label class="fw-bold">🔍 กรองตามหน่วยงาน</label><select id="filter-dept" class="form-select" onchange="renderTable()"><option value="all">แสดงทุกแผนก</option></select></div>
+                        <div class="col-md-3 text-center"><div class="bg-light p-2 rounded border"><small class="text-muted d-block">คะแนนเฉลี่ยกลุ่มที่เลือก</small><strong id="filter-avg-val" class="h4 text-primary">0%</strong></div></div>
+                        <div class="col-md-4 text-end"><button class="btn btn-success fw-bold w-100" onclick="exportDeepCSV()">📥 Export Raw Data (Deep CSV)</button></div>
+                    </div>
+                    <div class="table-responsive"><table class="table table-hover align-middle"><thead class="table-dark"><tr><th>วันที่</th><th>HN</th><th>หน่วยงาน</th><th>คะแนน</th><th>จัดการ</th></tr></thead><tbody id="table-body"></tbody></table></div>
+                </div>
+            </div>
+
+            <div class="tab-pane fade" id="tab-dash">
+                <div class="row g-4">
+                    <div class="col-md-12"><div class="card p-4"><h5>📊 คะแนนเฉลี่ยแยกตามหน่วยงาน (TOP 10)</h5><canvas id="deptChart" height="100"></canvas></div></div>
+                    <div class="col-md-6"><div class="card p-4"><h5>📈 แนวโน้ม 15 เคสล่าสุด</h5><canvas id="trendChart"></canvas></div></div>
+                    <div class="col-md-6 text-center">
+                        <div class="card p-4 h-100 d-flex flex-column justify-content-center">
+                            <h4 class="kanit text-muted">ความสมบูรณ์รวมทั้งระบบ</h4>
+                            <div id="grand-avg" class="display-1 fw-bold text-primary">0%</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+// --- ส่วนข้อมูลที่คงไว้ 100% ตามเอกสารของคุณ ---
+const DB_NAME = 'MHR_MASTER_PRODUCTION_V1';
+const DEPTS = ["ห้องตรวจเบอร์1","ห้องตรวจเบอร์2","ห้องตรวจเบอร์3","ห้องตรวจเบอร์4","ห้องตรวจเบอร์6","ห้องตรวจเบอร์7","ห้องตรวจเบอร์9","ห้องตรวจเบอร์10","ห้องตรวจเบอร์21","ห้องตรวจเบอร์22","ห้องตรวจเบอร์23","ห้องตรวจเบอร์24","ห้องตรวจเบอร์26","ห้องตรวจเบอร์28","ห้องตรวจเบอร์29","ศูนย์สุขภาพมหาวิทยาลัยเชียงใหม่","ห้องตรวจศัลยกรรมทั่วไปห้อง101","หน่วยเคมีบำบัดผู้ป่วยนอก1","ห้องตรวจรังสีรักษา","ห้องตรวจพิเศษเด็ก1 (OPD27)","ห้องตรวจเฉพาะทางนอกเวลา","ห้องตรวจคลื่นไฟฟ้าหัวใจ (EKG)","ศูนย์ประสานงานและบริการผู้ป่วย","EID clinic","VRE/CRE clinic","URI clinic","OPD Retina Clinic","CMU Mental Health Center(ศูนย์สุขใจ)","ศูนย์บริการแพทย์ทางไกล(MTC)","หน่วยสุขศึกษาโรคไม่ติดต่อเรื้อรัง(NCDs)","Ostomy Clinic","งานการพยาบาลผู้ป่วยนอกและผู้ป่วยฉุกเฉิน","หน่วยตรวจฉุกเฉิน","หน่วยผ่าตัดเล็ก","หอผู้ป่วยสังเกตอาการ","ห้องตรวจนอกเวลาราชการ","หน่วยบริการการแพทย์ฉุกเฉินและประสานงานส่งต่อ","ห้องตรวจเบอร์110"];
+
+const PHYSICIAN_CRITERIA = [
+    { id: "p1", label: "ข้อ 1: วันเวลาที่มารับบริการ", max: 1, opts: [["0", "0: ไม่บันทึก"], ["1", "1: บันทึกครบถ้วน"]] },
+    { id: "p2", label: "ข้อ 2: อาการสำคัญ (CC) ระบุระยะเวลา", max: 2, opts: [["0", "0: ไม่บันทึก"], ["1", "1: ขาดระยะเวลา"], ["2", "2: บันทึกครบถ้วนชัดเจน"]] },
+    { id: "p3", label: "ข้อ 3: ประวัติปัจจุบัน/อดีต (PI/PH)", max: 2, opts: [["0", "0: ไม่มีบันทึก"], ["1", "1: บันทึกไม่ครบ"], ["2", "2: บันทึกสมบูรณ์"]] },
+    { id: "p4", label: "ข้อ 4: ตรวจร่างกายทุกระบบที่สำคัญ+ชันสูตร", max: 4, opts: [["0", "0: ไม่บันทึก"], ["1", "1: 1 ระบบ"], ["2", "2: 2 ระบบ"], ["3", "3: >2 ระบบ/ไม่ชันสูตร"], ["4", "4: ครบ+ชันสูตร"]] },
+    { id: "p5", label: "ข้อ 5: การวินิจฉัยโรค (ไม่ใช้ตัวย่อ/ICD อย่างเดียว)", max: 4, opts: [["NA", "N/A"], ["0", "0: ไม่บันทึก"], ["1", "1: ไม่ครบ"], ["2", "2: กำกวม"], ["3", "3: ตัวย่อ"], ["4", "4: สมบูรณ์"]] },
+    { id: "p6", label: "ข้อ 6: แผนการรักษาและคำแนะนำ (ชัดเจน)", max: 3, opts: [["NA", "N/A"], ["0", "0: RM/Same"], ["1", "1: ขาดจุดหลัก"], ["2", "2: ขาดจุดย่อย"], ["3", "3: สมบูรณ์"]] }
+];
+
+const NURSE_CRITERIA = [
+    { id: "n1", label: "N1.1 บันทึกเวลาแรกรับ", max: 1, opts: [["1", "มี"], ["0", "ไม่มี"]] },
+    { id: "n2", label: "N1.2.1 บันทึกชื่อโรค/การวินิจฉัย", max: 1, opts: [["1", "มี"], ["0", "ไม่มี"], ["NA", "N/A"]] },
+    { id: "n3", label: "N1.3.1 กิจกรรมพยาบาลสอดคล้องกับปัญหา", max: 1, opts: [["1", "สอดคล้อง"], ["0", "ไม่สอดคล้อง"]] },
+    { id: "n4", label: "N2.1 ข้อวินิจฉัยพยาบาลถูกต้อง", max: 1, opts: [["1", "ถูกต้อง"], ["0", "ไม่ถูกต้อง"]] },
+    { id: "n5", label: "N3.2 การประเมินซ้ำในช่วงเวลาที่เหมาะสม", max: 1, opts: [["1", "มี"], ["0", "ไม่มี"]] },
+    { id: "n6", label: "N4.1 บันทึกการเปลี่ยนแปลงและการตอบสนอง", max: 1, opts: [["1", "มี"], ["0", "ไม่มี"], ["NA", "N/A"]] },
+    { id: "n7", label: "N5.2 บันทึกการให้คำแนะนำ (M/E/H/T/D/O)", max: 1, opts: [["1", "มี"], ["0", "ไม่มี"]] },
+    { id: "n8", label: "N7.1 บันทึกคำแนะนำก่อนกลับบ้าน", max: 1, opts: [["1", "มี"], ["0", "ไม่มี"]] },
+    { id: "n9", label: "N8.3 ลงชื่อตัวบรรจง/อ่านออกชัดเจน", max: 1, opts: [["1", "ชัดเจน"], ["0", "ไม่ชัดเจน"]] }
+];
+
+const RISK_CRITERIA = [
+    { id: "r1", label: "R1 Pain: ระดับ/ตำแหน่ง", max: 1, opts: [["1", "ประเมินครบ"], ["0", "ไม่ประเมิน"]] },
+    { id: "r2", label: "R2 Pain: การพยาบาลและการประเมินซ้ำ", max: 1, opts: [["1", "ครบถ้วน"], ["0", "ไม่ครบ"], ["NA", "N/A"]] },
+    { id: "r3", label: "R3 Falling: ประเมินความเสี่ยงถูกต้อง", max: 1, opts: [["1", "ถูกต้อง"], ["0", "ไม่ถูกต้อง"]] },
+    { id: "r4", label: "R4 PI: ประเมินความเสี่ยงแผลกดทับถูกต้อง", max: 1, opts: [["1", "ถูกต้อง"], ["0", "ไม่ถูกต้อง"]] }
+];
+
+// --- ฟังก์ชันการทำงานพื้นฐาน ---
+let db = JSON.parse(localStorage.getItem(DB_NAME)) || [];
+let charts = { trend: null, dept: null };
+
+function buildForm() {
+    const dSel = document.getElementById('department');
+    const fSel = document.getElementById('filter-dept');
+    DEPTS.forEach(d => { dSel.add(new Option(d, d)); fSel.add(new Option(d, d)); });
+    const render = (data, containerId) => {
+        const container = document.getElementById(containerId);
+        data.forEach(q => {
+            let opts = q.opts.map(o => `<option value="${o[0]}">${o[1]}</option>`).join('');
+            container.innerHTML += `<div class="q-row"><label class="small fw-bold text-muted d-block mb-1">${q.label}</label><select id="${q.id}" class="form-select form-select-sm audit-input" data-max="${q.max}" data-cat="${containerId}">${opts}</select></div>`;
+        });
+    };
+    render(PHYSICIAN_CRITERIA, 'doctor-qs');
+    render(NURSE_CRITERIA, 'nurse-qs');
+    render(RISK_CRITERIA, 'risk-qs');
+    document.querySelectorAll('.audit-input').forEach(el => el.onchange = calculateLiveScore);
+}
+
+function calculateLiveScore() {
+    let earned = 0, total = 0;
+    document.querySelectorAll('.audit-input').forEach(sel => {
+        if (sel.value !== "NA") { earned += parseInt(sel.value); total += parseInt(sel.dataset.max); }
+    });
+    const result = total > 0 ? ((earned / total) * 100).toFixed(2) : 0;
+    document.getElementById('live-score').innerText = result + "%";
+    return { percent: result };
+}
+
+function analyzeBeforeSave() {
+    const res = calculateLiveScore();
+    const cats = { 'doctor-qs': {e:0, t:0, name: 'ส่วนแพทย์'}, 'nurse-qs': {e:0, t:0, name: 'ส่วนพยาบาล'}, 'risk-qs': {e:0, t:0, name: 'ส่วนความเสี่ยง'} };
+    document.querySelectorAll('.audit-input').forEach(sel => {
+        if(sel.value !== "NA") { cats[sel.dataset.cat].e += parseInt(sel.value); cats[sel.dataset.cat].t += parseInt(sel.dataset.max); }
+    });
+    let html = `<strong>คะแนนรวม: ${res.percent}%</strong><br><ul class="mt-2 mb-0">`;
+    for(let k in cats) {
+        let p = cats[k].t > 0 ? ((cats[k].e/cats[k].t)*100).toFixed(0) : 0;
+        html += `<li class="${p >= 80 ? 'text-success' : 'text-danger'}">${cats[k].name}: ${p}%</li>`;
+    }
+    document.getElementById('analysis-content').innerHTML = html + `</ul>`;
+    document.getElementById('pre-save-analysis').style.display = 'block';
+}
+
+document.getElementById('auditForm').onsubmit = (e) => {
+    e.preventDefault();
+    const scoreRes = calculateLiveScore();
+    const responses = {};
+    document.querySelectorAll('.audit-input').forEach(el => responses[el.id] = el.value);
+    const record = {
+        id: document.getElementById('edit-id').value || Date.now(),
+        date: document.getElementById('date').value,
+        hn: document.getElementById('hn').value,
+        dept: document.getElementById('department').value,
+        score: parseFloat(scoreRes.percent),
+        comment: document.getElementById('comment').value,
+        auditor: sessionStorage.getItem('haitUser'),
+        data: responses
+    };
+    const idx = db.findIndex(r => r.id == record.id);
+    if (idx > -1) db[idx] = record; else db.push(record);
+    localStorage.setItem(DB_NAME, JSON.stringify(db));
+    alert('บันทึกสำเร็จ!'); location.reload();
+};
+
+function renderTable() {
+    const filter = document.getElementById('filter-dept').value;
+    const tbody = document.getElementById('table-body');
+    tbody.innerHTML = '';
+    let filtered = db.filter(r => filter === 'all' || r.dept === filter);
+    let sum = 0;
+    filtered.sort((a,b)=>b.id-a.id).forEach(r => {
+        sum += r.score;
+        tbody.innerHTML += `<tr><td>${r.date}</td><td>${r.hn}</td><td>${r.dept}</td><td class="fw-bold text-primary">${r.score}%</td><td><button class="btn btn-sm btn-warning me-1" onclick="editItem(${r.id})">แก้ไข</button><button class="btn btn-sm btn-danger" onclick="deleteItem(${r.id})">ลบ</button></td></tr>`;
+    });
+    document.getElementById('filter-avg-val').innerText = (filtered.length ? (sum/filtered.length).toFixed(2) : 0) + "%";
+}
+
+// --- ส่วน Dashboard ที่ทำให้ Trend กลับมาทำงานได้สมบูรณ์ ---
+function updateDashboard() {
+    const data = JSON.parse(localStorage.getItem(DB_NAME)) || [];
+    const avg = data.length ? (data.reduce((s,r)=>s+r.score, 0)/data.length).toFixed(2) : 0;
+    document.getElementById('grand-avg').innerText = avg + "%";
+
+    const deptMap = {};
+    data.forEach(r => {
+        if(!deptMap[r.dept]) deptMap[r.dept] = {s:0, c:0};
+        deptMap[r.dept].s += r.score; deptMap[r.dept].c++;
+    });
+    const sorted = Object.keys(deptMap).sort((a,b)=>(deptMap[b].s/deptMap[b].c)-(deptMap[a].s/deptMap[a].c)).slice(0,10);
+    if(charts.dept) charts.dept.destroy();
+    charts.dept = new Chart(document.getElementById('deptChart'), {
+        type: 'bar',
+        data: { labels: sorted, datasets: [{label:'ความสมบูรณ์ %', data: sorted.map(d=>(deptMap[d].s/deptMap[d].c).toFixed(1)), backgroundColor:'#6a2c91'}] }
+    });
+
+    // แก้ไข Trend Chart ให้แสดงผลจากข้อมูลล่าสุด
+    const last15 = [...data].sort((a,b) => a.id - b.id).slice(-15);
+    if(charts.trend) charts.trend.destroy();
+    charts.trend = new Chart(document.getElementById('trendChart'), {
+        type: 'line',
+        data: { 
+            labels: last15.map(r => r.hn), 
+            datasets: [{
+                label: 'Score %', 
+                data: last15.map(r => r.score), 
+                borderColor: '#a4508b', 
+                backgroundColor: 'rgba(164, 80, 139, 0.1)',
+                fill: true,
+                tension: 0.3
+            }] 
+        },
+        options: { scales: { y: { min: 0, max: 100 } } }
+    });
+}
+
+function editItem(id) {
+    const r = db.find(i => i.id == id);
+    document.getElementById('btn-tab-form').click();
+    document.getElementById('edit-id').value = r.id;
+    document.getElementById('date').value = r.date;
+    document.getElementById('hn').value = r.hn;
+    document.getElementById('department').value = r.dept;
+    document.getElementById('comment').value = r.comment;
+    for(let k in r.data) { if(document.getElementById(k)) document.getElementById(k).value = r.data[k]; }
+    calculateLiveScore();
+    window.scrollTo(0,0);
+}
+
+function deleteItem(id) { if(confirm('ลบ?')) { db = db.filter(i=>i.id != id); localStorage.setItem(DB_NAME, JSON.stringify(db)); renderTable(); } }
+
+function exportDeepCSV() {
+    if(db.length === 0) return alert('ไม่มีข้อมูล');
+    let header = "วันที่,HN,หน่วยงาน,คะแนนรวม%,ผู้ตรวจ,";
+    [...PHYSICIAN_CRITERIA, ...NURSE_CRITERIA, ...RISK_CRITERIA].forEach(c => header += `${c.label},`);
+    header += "ข้อเสนอแนะ\n";
+    let csv = "\ufeff" + header;
+    db.forEach(r => {
+        let row = `${r.date},${r.hn},${r.dept},${r.score},${r.auditor},`;
+        [...PHYSICIAN_CRITERIA, ...NURSE_CRITERIA, ...RISK_CRITERIA].forEach(c => row += `${r.data[c.id] || ''},`);
+        row += `"${r.comment.replace(/"/g, '""')}"\n`;
+        csv += row;
+    });
+    const blob = new Blob([csv], {type: 'text/csv;charset=utf-8;'});
+    const link = document.createElement('a'); link.href = URL.createObjectURL(blob); link.download = 'MHR_Deep_Export.csv'; link.click();
+}
+
+document.getElementById('auth-form').onsubmit = (e) => {
+    e.preventDefault();
+    const email = document.getElementById('email').value.toLowerCase();
+    if(email.endsWith('@cmu.ac.th')) { sessionStorage.setItem('haitLogged', 'true'); sessionStorage.setItem('haitUser', email); startApp(); }
+    else alert('ใช้ @cmu.ac.th');
+};
+function startApp() {
+    document.getElementById('login-screen').style.display = 'none';
+    document.getElementById('app-content').style.display = 'block';
+    document.getElementById('user-display').innerText = "👨‍⚕️ " + sessionStorage.getItem('haitUser');
+    buildForm();
+}
+function logout() { sessionStorage.clear(); location.reload(); }
+if(sessionStorage.getItem('haitLogged') === 'true') startApp();
+</script>
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+</body>
+</html>
